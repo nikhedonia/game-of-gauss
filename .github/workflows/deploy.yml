@@ -1,0 +1,43 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npx vitest run
+      - name: Check GA secret is available
+        env:
+          EXPO_PUBLIC_GA_ID: ${{ secrets.GA_MEASUREMENT_ID }}
+        run: |
+          if [ -z "$EXPO_PUBLIC_GA_ID" ]; then
+            echo "::warning::GA_MEASUREMENT_ID secret is empty or not found"
+          else
+            echo "GA_MEASUREMENT_ID secret is set (${#EXPO_PUBLIC_GA_ID} chars)"
+          fi
+      - name: Build
+        env:
+          EXPO_PUBLIC_GA_ID: ${{ secrets.GA_MEASUREMENT_ID }}
+        run: npx expo export -p web
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

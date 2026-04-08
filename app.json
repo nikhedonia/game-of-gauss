@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Gauss Game",
+    "slug": "gauss-game",
+    "version": "1.0.0",
+    "platforms": ["web"],
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    }
+  }
+}
