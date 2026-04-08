@@ -100,17 +100,27 @@ describe('matricesEqual', () => {
 });
 
 describe('generatePuzzle', () => {
-  it('returns a target matrix of the correct size', () => {
-    const { target } = generatePuzzle(3, 2);
+  it('returns current and target matrices of the correct size', () => {
+    const { current, target } = generatePuzzle(3, 2);
+    expect(current.length).toBe(3);
     expect(target.length).toBe(3);
+    current.forEach((row) => expect(row.length).toBe(3));
     target.forEach((row) => expect(row.length).toBe(3));
   });
 
-  it('creates a target different from identity when numOps > 0', () => {
+  it('target has at least half its entries non-zero', () => {
+    for (let i = 0; i < 10; i++) {
+      const { target } = generatePuzzle(3, 2);
+      const nonZero = target.flat().filter((v) => v !== 0).length;
+      expect(nonZero).toBeGreaterThanOrEqual(Math.ceil((3 * 3) / 2));
+    }
+  });
+
+  it('current differs from target after scrambling', () => {
     let differentFound = false;
     for (let i = 0; i < 20; i++) {
-      const { target } = generatePuzzle(3, 2, 4);
-      if (!matricesEqual(target, identityMatrix(3))) {
+      const { current, target } = generatePuzzle(3, 2, 4);
+      if (!matricesEqual(current, target)) {
         differentFound = true;
         break;
       }
@@ -120,8 +130,8 @@ describe('generatePuzzle', () => {
 
   it('all values are in range [0, m-1]', () => {
     const m = 3;
-    const { target } = generatePuzzle(4, m);
-    target.forEach((row) => row.forEach((val) => {
+    const { current, target } = generatePuzzle(4, m);
+    [...current, ...target].forEach((row) => row.forEach((val) => {
       expect(val).toBeGreaterThanOrEqual(0);
       expect(val).toBeLessThan(m);
     }));

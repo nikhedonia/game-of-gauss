@@ -32,25 +32,40 @@ export function matricesEqual(a: Matrix, b: Matrix): boolean {
   return true;
 }
 
-export function generatePuzzle(n: number, m: number, numOps?: number): { target: Matrix } {
-  const ops = numOps ?? n * 2 + Math.floor(Math.random() * n);
-  let target = identityMatrix(n);
-
+function applyRandomOps(matrix: Matrix, n: number, m: number, ops: number): Matrix {
+  let result = matrix;
   for (let k = 0; k < ops; k++) {
     const useRow = Math.random() < 0.5;
     let src = Math.floor(Math.random() * n);
     let dest = Math.floor(Math.random() * n);
-    while (dest === src) {
-      dest = Math.floor(Math.random() * n);
-    }
-    if (useRow) {
-      target = addRow(target, src, dest, m);
-    } else {
-      target = addCol(target, src, dest, m);
-    }
+    while (dest === src) dest = Math.floor(Math.random() * n);
+    result = useRow ? addRow(result, src, dest, m) : addCol(result, src, dest, m);
   }
+  return result;
+}
 
-  return { target };
+function countNonZero(matrix: Matrix): number {
+  return matrix.reduce((sum, row) => sum + row.filter((v) => v !== 0).length, 0);
+}
+
+function randomTarget(n: number, m: number): Matrix {
+  // Retry until at least half the entries are non-zero (non-trivial target).
+  const minNonZero = Math.ceil((n * n) / 2);
+  let matrix: Matrix;
+  do {
+    matrix = Array.from({ length: n }, () =>
+      Array.from({ length: n }, () => Math.floor(Math.random() * m))
+    );
+  } while (countNonZero(matrix) < minNonZero);
+  return matrix;
+}
+
+export function generatePuzzle(n: number, m: number, numOps?: number): { current: Matrix; target: Matrix } {
+  const ops = numOps ?? n * 2 + Math.floor(Math.random() * n);
+  const target = randomTarget(n, m);
+  // Scramble target via row/col ops to produce current.
+  const current = applyRandomOps(target, n, m, Math.max(1, ops));
+  return { current, target };
 }
 
 const PALETTE_M2 = ['#ffffff', '#111111'];

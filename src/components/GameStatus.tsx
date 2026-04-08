@@ -15,6 +15,8 @@ export default function GameStatus() {
   const gameOver = useGameStore((s) => s.gameOver);
   const elapsedSecs = useGameStore((s) => s.elapsedSecs);
   const solvedCount = useGameStore((s) => s.solvedCount);
+  const peekCount = useGameStore((s) => s.peekCount);
+  const peekPhase = useGameStore((s) => s.peekPhase);
   const nextPuzzle = useGameStore((s) => s.nextPuzzle);
   const resetPuzzle = useGameStore((s) => s.resetPuzzle);
   const backToSetup = useGameStore((s) => s.backToSetup);
@@ -24,34 +26,50 @@ export default function GameStatus() {
       ? Math.max(0, config.raceTimeSecs - elapsedSecs)
       : null;
 
+  const showStats = !config.peekMode || peekPhase === 'solve';
+
   return (
     <View style={styles.container}>
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Moves</Text>
-          <Text style={styles.statValue}>{moveCount}</Text>
-        </View>
-
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>
-            {config.mode === 'race' ? 'Time Left' : 'Elapsed'}
-          </Text>
-          <Text style={[styles.statValue, remaining !== null && remaining < 10 && styles.urgentText]}>
-            {remaining !== null ? formatTime(remaining) : formatTime(elapsedSecs)}
-          </Text>
-        </View>
-
-        {config.mode === 'race' && (
+      {showStats && (
+        <View style={styles.statsRow}>
           <View style={styles.stat}>
-            <Text style={styles.statLabel}>Solved</Text>
-            <Text style={styles.statValue}>{solvedCount}</Text>
+            <Text style={styles.statLabel}>Moves</Text>
+            <Text style={styles.statValue}>{moveCount}</Text>
           </View>
-        )}
-      </View>
+
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>
+              {config.mode === 'race' ? 'Time Left' : 'Time'}
+            </Text>
+            <Text style={[styles.statValue, remaining !== null && remaining < 10 && styles.urgentText]}>
+              {remaining !== null ? formatTime(remaining) : formatTime(elapsedSecs)}
+            </Text>
+          </View>
+
+          {config.mode === 'race' && (
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>Solved</Text>
+              <Text style={styles.statValue}>{solvedCount}</Text>
+            </View>
+          )}
+
+          {config.peekMode && (
+            <View style={styles.stat}>
+              <Text style={styles.statLabel}>Peeks</Text>
+              <Text style={styles.statValue}>{peekCount}</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {solved && config.mode === 'oneoff' && (
         <View style={styles.messageBox}>
           <Text style={styles.solvedText}>🎉 Solved!</Text>
+          {config.peekMode && (
+            <Text style={styles.peekResult}>
+              {formatTime(elapsedSecs)} · {peekCount} peek{peekCount !== 1 ? 's' : ''}
+            </Text>
+          )}
           <TouchableOpacity style={styles.btn} onPress={nextPuzzle}>
             <Text style={styles.btnText}>Next Puzzle</Text>
           </TouchableOpacity>
@@ -116,6 +134,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#27ae60',
+    marginBottom: 4,
+  },
+  peekResult: {
+    fontSize: 15,
+    color: '#c05000',
+    fontWeight: '600',
     marginBottom: 6,
   },
   gameOverText: {

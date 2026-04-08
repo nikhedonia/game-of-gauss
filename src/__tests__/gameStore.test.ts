@@ -12,6 +12,7 @@ beforeEach(() => {
     config: DEFAULT_CONFIG,
     target: identityMatrix(3),
     current: identityMatrix(3),
+    initialCurrent: identityMatrix(3),
     moveCount: 0,
     solved: false,
     gameOver: false,
@@ -29,10 +30,10 @@ describe('startGame', () => {
     expect(useGameStore.getState().screen).toBe('playing');
   });
 
-  it('initializes current as identity matrix', () => {
+  it('initializes current as non-identity matrix', () => {
     useGameStore.getState().startGame(DEFAULT_CONFIG);
     const { current, config } = useGameStore.getState();
-    expect(matricesEqual(current, identityMatrix(config.n))).toBe(true);
+    expect(matricesEqual(current, identityMatrix(config.n))).toBe(false);
   });
 
   it('sets the config correctly', () => {
@@ -114,27 +115,27 @@ describe('selectCol', () => {
 });
 
 describe('resetPuzzle', () => {
-  it('resets current to identity and moveCount to 0', () => {
+  it('resets current to initialCurrent and moveCount to 0', () => {
     useGameStore.getState().startGame(DEFAULT_CONFIG);
+    const initialCurrent = useGameStore.getState().current;
     useGameStore.setState({ moveCount: 5 });
+    // Apply an operation to change current
     useGameStore.getState().selectRow(0);
+    useGameStore.getState().selectRow(1);
     useGameStore.getState().resetPuzzle();
-    const { current, moveCount, config } = useGameStore.getState();
-    expect(matricesEqual(current, identityMatrix(config.n))).toBe(true);
+    const { current, moveCount } = useGameStore.getState();
+    expect(matricesEqual(current, initialCurrent)).toBe(true);
     expect(moveCount).toBe(0);
   });
 });
 
 describe('nextPuzzle', () => {
-  it('resets current to identity and generates new target', () => {
+  it('generates a new non-identity current and resets moveCount', () => {
     useGameStore.getState().startGame(DEFAULT_CONFIG);
-    const oldTarget = useGameStore.getState().target;
-    useGameStore.setState({ current: [[1, 1, 0], [0, 1, 0], [0, 0, 1]] });
     useGameStore.getState().nextPuzzle();
-    const { current, config } = useGameStore.getState();
-    expect(matricesEqual(current, identityMatrix(config.n))).toBe(true);
-    // Target may or may not change (random), but current is reset
-    void oldTarget; // suppress unused warning
+    const { current, config, moveCount } = useGameStore.getState();
+    expect(matricesEqual(current, identityMatrix(config.n))).toBe(false);
+    expect(moveCount).toBe(0);
   });
 });
 

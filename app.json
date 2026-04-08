@@ -6,7 +6,7 @@
     "platforms": ["web"],
     "web": {
       "bundler": "metro",
-      "output": "static"
+      "output": "single"
     }
   }
 }

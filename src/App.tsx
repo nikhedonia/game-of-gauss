@@ -4,6 +4,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import SetupScreen from './components/SetupScreen';
 import GameBoard from './components/GameBoard';
 import GameStatus from './components/GameStatus';
+import StatsScreen from './components/StatsScreen';
 import { useGameStore } from './store/gameStore';
 import { trackPageView } from './analytics';
 
@@ -37,7 +38,7 @@ function Game() {
 }
 
 const styles = StyleSheet.create({
-  app: { flex: 1, alignItems: 'center', padding: 10 },
+  app: { flex: 1, width: '100%', padding: 10 },
   safeArea: { flex: 1, backgroundColor: '#f3f4f6', alignItems: 'center' },
   centeredContainer: { flex: 1, width: '100%', maxWidth: 600 },
 });
@@ -53,7 +54,9 @@ export default function App() {
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centeredContainer}>
-          {screen === 'setup' ? <SetupScreen /> : <Game />}
+          {screen === 'setup' && <SetupScreen />}
+          {screen === 'playing' && <Game />}
+          {screen === 'stats' && <StatsScreen />}
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
