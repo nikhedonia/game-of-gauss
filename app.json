@@ -6,7 +6,8 @@
     "platforms": ["web"],
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "baseUrl": "/game-of-gauss"
     }
   }
 }
