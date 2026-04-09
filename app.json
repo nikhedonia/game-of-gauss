@@ -3,10 +3,12 @@
     "name": "Gauss Game",
     "slug": "gauss-game",
     "version": "1.0.0",
-    "platforms": ["web"],
+    "platforms": ["web", "ios", "android"],
     "web": {
       "bundler": "metro",
-      "output": "single",
+      "output": "single"
+    },
+    "experiments": {
       "baseUrl": "/game-of-gauss"
     }
   }
