@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import create from 'zustand';
 import { GameConfig, Matrix, PeekPhase } from '../types';
 import {
   identityMatrix,

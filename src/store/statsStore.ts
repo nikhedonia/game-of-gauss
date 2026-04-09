@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import create from 'zustand';
+import { persist } from 'zustand/middleware';
 import { GameStat } from '../types';
 
 interface StatsState {
@@ -21,7 +21,7 @@ const safeLocalStorage = {
   },
 };
 
-export const useStatsStore = create<StatsState>()(
+export const useStatsStore = create<StatsState>(
   persist(
     (set) => ({
       history: [],
@@ -40,7 +40,7 @@ export const useStatsStore = create<StatsState>()(
     }),
     {
       name: 'gauss-game-stats',
-      storage: createJSONStorage(() => safeLocalStorage),
+      getStorage: () => safeLocalStorage,
     }
   )
 );
