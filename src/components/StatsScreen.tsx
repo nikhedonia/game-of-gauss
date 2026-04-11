@@ -37,6 +37,7 @@ function OneoffSection({ stats }: { stats: GameStat[] }) {
   const bestTime = Math.min(...stats.map((s) => s.elapsedSecs));
   const bestMoves = Math.min(...stats.map((s) => s.totalMoves));
   const avgTime = Math.round(stats.reduce((sum, s) => sum + s.elapsedSecs, 0) / stats.length);
+  const avgMoves = (stats.reduce((sum, s) => sum + s.totalMoves, 0) / stats.length).toFixed(1);
   const peekStats = stats.filter((s) => s.peekMode);
   const bestPeeks = peekStats.length > 0 ? Math.min(...peekStats.map((s) => s.peekCount)) : null;
 
@@ -49,6 +50,7 @@ function OneoffSection({ stats }: { stats: GameStat[] }) {
         <StatPill label="Best Time" value={formatTime(bestTime)} />
         <StatPill label="Avg Time" value={formatTime(avgTime)} />
         <StatPill label="Fewest Moves" value={String(bestMoves)} />
+        <StatPill label="Avg Moves" value={avgMoves} />
         {bestPeeks !== null && <StatPill label="Fewest Peeks" value={String(bestPeeks)} />}
       </View>
     </View>

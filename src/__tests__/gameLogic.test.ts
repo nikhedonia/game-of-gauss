@@ -116,16 +116,18 @@ describe('generatePuzzle', () => {
     }
   });
 
-  it('current differs from target after scrambling', () => {
-    let differentFound = false;
-    for (let i = 0; i < 20; i++) {
-      const { current, target } = generatePuzzle(3, 2, 4);
-      if (!matricesEqual(current, target)) {
-        differentFound = true;
-        break;
-      }
+  it('current is never equal to target', () => {
+    for (let i = 0; i < 50; i++) {
+      const { current, target } = generatePuzzle(3, 2);
+      expect(matricesEqual(current, target)).toBe(false);
     }
-    expect(differentFound).toBe(true);
+  });
+
+  it('current is never equal to target when numOps=1', () => {
+    for (let i = 0; i < 50; i++) {
+      const { current, target } = generatePuzzle(3, 2, 1);
+      expect(matricesEqual(current, target)).toBe(false);
+    }
   });
 
   it('all values are in range [0, m-1]', () => {

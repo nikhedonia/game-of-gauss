@@ -141,13 +141,13 @@ describe('nextPuzzle', () => {
 
 describe('tick', () => {
   it('increments elapsedSecs', () => {
-    useGameStore.setState({ elapsedSecs: 5, gameOver: false, solved: false, config: DEFAULT_CONFIG });
+    useGameStore.setState({ elapsedSecs: 5, gameOver: false, solved: false, config: DEFAULT_CONFIG, gamePhase: 'playing' });
     useGameStore.getState().tick();
     expect(useGameStore.getState().elapsedSecs).toBe(6);
   });
 
   it('does not tick when gameOver', () => {
-    useGameStore.setState({ elapsedSecs: 5, gameOver: true, config: DEFAULT_CONFIG });
+    useGameStore.setState({ elapsedSecs: 5, gameOver: true, config: DEFAULT_CONFIG, gamePhase: 'playing' });
     useGameStore.getState().tick();
     expect(useGameStore.getState().elapsedSecs).toBe(5);
   });
@@ -159,6 +159,7 @@ describe('tick', () => {
       solved: false,
       config: RACE_CONFIG,
       solvedCount: 2,
+      gamePhase: 'playing',
     });
     useGameStore.getState().tick();
     expect(useGameStore.getState().gameOver).toBe(true);

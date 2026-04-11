@@ -2,6 +2,7 @@ export type Matrix = number[][];
 
 export type GameMode = 'oneoff' | 'race';
 export type PeekPhase = 'memorize' | 'solve';
+export type GamePhase = 'preview' | 'playing';
 
 export type OperationType = 'row' | 'col';
 

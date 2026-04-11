@@ -1,65 +1,54 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Animated } from 'react-native';
 import { useGameStore } from '../store/gameStore';
 import { getColorForValue } from '../gameLogic';
+import type { GamePhase } from '../types';
 
 const BTN = 36;
-// Estimated height consumed by GameStatus + app padding + safe area insets
-const OVERHEAD = 220;
-const LABEL_H = 22;  // matrix label + marginBottom
-const MATRIX_GAP = 16;
+const PADDING = 10;
+const STATUS_BAR_HEIGHT = 110;
+const BUTTONS_BAR_HEIGHT = 60;
+// Fixed-height zones above/below the matrix keep it anchored regardless of content.
+const HINT_ZONE_HEIGHT = 50;
+const ACTION_ZONE_HEIGHT = 56;
+const SMALL_CIRCLE_RATIO = 0.196;
 
-function computeCellSize(
-  windowWidth: number,
-  windowHeight: number,
-  n: number,
-  numMatrices: number,
+function getTargetOverlaySize(
+  gamePhase: GamePhase,
+  isPeeking: boolean,
+  peekMode: boolean,
+  cellSize: number,
 ): number {
-  const containerWidth = Math.min(windowWidth, 600) - 20; // 10px padding each side
-  // Width: subtract BTN (row-button column) from available width
-  const cellSizeW = Math.floor((containerWidth - BTN - 2) / n);
-  // Height: fit numMatrices matrices, each needing a label + BTN header row + n data rows
-  const fixedH = numMatrices * (LABEL_H + BTN) + (numMatrices > 1 ? MATRIX_GAP : 0);
-  const cellSizeH = Math.floor((windowHeight - OVERHEAD - fixedH) / (numMatrices * n));
-  return Math.max(20, Math.min(cellSizeW, cellSizeH, 100));
+  if (gamePhase === 'preview') return cellSize;
+  if (peekMode) return isPeeking ? cellSize : 0;
+  return Math.max(6, Math.round(cellSize * SMALL_CIRCLE_RATIO * 2));
 }
 
-// Renders the target matrix aligned with CurrentMatrix:
-// a spacer column (same width as row buttons) and a spacer row (same height as col buttons)
-// are drawn as inactive placeholder blocks so both matrices share the same grid alignment.
-function TargetMatrix({ matrix, m, cellSize }: { matrix: number[][]; m: number; cellSize: number }) {
-  return (
-    <View>
-      {/* Header row: corner spacer + col placeholders aligned with col buttons */}
-      <View style={styles.matrixRow}>
-        <View style={{ width: BTN }} />
-        {matrix[0].map((_, j) => (
-          <View key={j} style={[styles.placeholder, { width: cellSize, height: BTN }]} />
-        ))}
-      </View>
-      {/* Data rows: row placeholder aligned with row buttons + cells */}
-      {matrix.map((row, i) => (
-        <View key={i} style={styles.matrixRow}>
-          <View style={[styles.placeholder, { width: BTN, height: cellSize }]} />
-          {row.map((val, j) => (
-            <View
-              key={j}
-              style={[
-                styles.cell,
-                { width: cellSize, height: cellSize, backgroundColor: getColorForValue(val, m) },
-              ]}
-            >
-              {m > 2 && (
-                <Text style={[styles.cellText, { color: val === 0 ? '#333' : '#fff' }]}>
-                  {val}
-                </Text>
-              )}
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
-  );
+function getTargetOverlayRadius(
+  gamePhase: GamePhase,
+  isPeeking: boolean,
+  peekMode: boolean,
+  cellSize: number,
+): number {
+  if (gamePhase === 'preview') return 2;
+  if (peekMode) return isPeeking ? 2 : 0;
+  const size = Math.max(6, Math.round(cellSize * SMALL_CIRCLE_RATIO * 2));
+  return size / 2;
+}
+
+function computeCellSize(windowWidth: number, windowHeight: number, n: number): number {
+  const containerWidth = Math.min(windowWidth, 600) - 2 * PADDING;
+  const availableH =
+    windowHeight -
+    STATUS_BAR_HEIGHT -
+    BUTTONS_BAR_HEIGHT -
+    3 * PADDING -
+    HINT_ZONE_HEIGHT -
+    ACTION_ZONE_HEIGHT;
+  const cellSizeW = Math.floor((containerWidth - BTN - 2) / n);
+  const fixedH = BTN; // col-button header row
+  const cellSizeH = Math.floor((availableH - fixedH) / n);
+  return Math.max(20, Math.min(cellSizeW, cellSizeH, 100));
 }
 
 export default function GameBoard() {
@@ -72,83 +61,92 @@ export default function GameBoard() {
   const selectCol = useGameStore((s) => s.selectCol);
   const solved = useGameStore((s) => s.solved);
   const gameOver = useGameStore((s) => s.gameOver);
-  const peekPhase = useGameStore((s) => s.peekPhase);
   const isPeeking = useGameStore((s) => s.isPeeking);
   const peekCount = useGameStore((s) => s.peekCount);
+  const gamePhase = useGameStore((s) => s.gamePhase);
+  const resetCount = useGameStore((s) => s.resetCount);
+  const beginPlay = useGameStore((s) => s.beginPlay);
   const startSolving = useGameStore((s) => s.startSolving);
   const togglePeek = useGameStore((s) => s.togglePeek);
 
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { n, m } = config;
-  // Peek mode shows only one matrix at a time; use more vertical space for it
-  const numMatrices = config.peekMode ? 1 : 2;
-  const cellSize = computeCellSize(windowWidth, windowHeight, n, numMatrices);
-  const disabled = solved || gameOver;
+  const peekMode = !!config.peekMode;
+  const cellSize = computeCellSize(windowWidth, windowHeight, n);
+  const disabled = solved || gameOver || gamePhase === 'preview';
 
-  if (config.peekMode && peekPhase === 'memorize') {
-    return (
-      <View style={styles.outer}>
-        <Text style={styles.peekMemorizeTitle}>Memorize the target!</Text>
-        <Text style={styles.peekMemorizeHint}>Tap "Ready" when you've got it.</Text>
-        <View style={styles.matrixBlock}>
-          <Text style={styles.matrixLabel}>Target</Text>
-          <TargetMatrix matrix={target} m={m} cellSize={cellSize} />
-        </View>
-        <TouchableOpacity style={styles.readyBtn} onPress={startSolving}>
-          <Text style={styles.readyBtnText}>Ready to Solve →</Text>
-        </TouchableOpacity>
-      </View>
+  // ── Target-overlay animation ─────────────────────────────────────────────
+  const sizeAnimRef = useRef<Animated.Value | null>(null);
+  const radiusAnimRef = useRef<Animated.Value | null>(null);
+  if (!sizeAnimRef.current) {
+    sizeAnimRef.current = new Animated.Value(
+      getTargetOverlaySize(gamePhase, isPeeking, peekMode, cellSize),
     );
   }
-
-  if (config.peekMode && peekPhase === 'solve') {
-    return (
-      <View style={styles.peekSolveOuter}>
-        <View style={styles.peekContent}>
-          {isPeeking ? (
-            <View style={styles.matrixBlock}>
-              <Text style={styles.matrixLabel}>Target</Text>
-              <TargetMatrix matrix={target} m={m} cellSize={cellSize} />
-            </View>
-          ) : (
-            <CurrentMatrix
-              current={current}
-              n={n}
-              m={m}
-              cellSize={cellSize}
-              selectedRow={selectedRow}
-              selectedCol={selectedCol}
-              selectRow={selectRow}
-              selectCol={selectCol}
-              disabled={disabled}
-            />
-          )}
-        </View>
-
-        {!solved && (
-          <TouchableOpacity
-            style={[styles.peekToggleBtn, isPeeking && styles.peekToggleBtnActive]}
-            onPress={togglePeek}
-          >
-            <Text style={[styles.peekToggleBtnText, isPeeking && styles.peekToggleBtnTextActive]}>
-              {isPeeking ? '🙈 Hide — back to solving' : '👁 Peek at Target'}
-              {peekCount > 0 && `  (${peekCount} peek${peekCount > 1 ? 's' : ''})`}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+  if (!radiusAnimRef.current) {
+    radiusAnimRef.current = new Animated.Value(
+      getTargetOverlayRadius(gamePhase, isPeeking, peekMode, cellSize),
     );
   }
+  const sizeAnim = sizeAnimRef.current;
+  const radiusAnim = radiusAnimRef.current;
 
-  // Default (oneoff / race): target above current, both left-aligned for column alignment
+  // Snap overlay dimensions immediately on window resize (no animation).
+  const prevCellSizeRef = useRef(cellSize);
+  useEffect(() => {
+    if (prevCellSizeRef.current !== cellSize) {
+      prevCellSizeRef.current = cellSize;
+      sizeAnim.setValue(getTargetOverlaySize(gamePhase, isPeeking, peekMode, cellSize));
+      radiusAnim.setValue(getTargetOverlayRadius(gamePhase, isPeeking, peekMode, cellSize));
+    }
+  });
+
+  // Animate overlay shape when phase or peek state changes.
+  useEffect(() => {
+    const toSize = getTargetOverlaySize(gamePhase, isPeeking, peekMode, cellSize);
+    const toRadius = getTargetOverlayRadius(gamePhase, isPeeking, peekMode, cellSize);
+    Animated.parallel([
+      Animated.timing(sizeAnim, { toValue: toSize, duration: 350, useNativeDriver: false }),
+      Animated.timing(radiusAnim, { toValue: toRadius, duration: 350, useNativeDriver: false }),
+    ]).start();
+    // cellSize intentionally omitted — resize handled by the snap effect above
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gamePhase, isPeeking]);
+
+  // ── Reset colour animation ───────────────────────────────────────────────
+  // During render, capture the matrix that was showing before current changes.
+  const prevCurrentRef = useRef<number[][]>(current);
+  const currentTrackRef = useRef<number[][]>(current);
+  if (currentTrackRef.current !== current) {
+    prevCurrentRef.current = currentTrackRef.current;
+    currentTrackRef.current = current;
+  }
+  const resetFadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (resetCount === 0) return;
+    // Instantly show old colours on top, then fade them away to reveal new state.
+    resetFadeAnim.setValue(1);
+    Animated.timing(resetFadeAnim, { toValue: 0, duration: 450, useNativeDriver: false }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetCount]);
+
   return (
     <View style={styles.outer}>
-      <View style={styles.matrixBlock}>
-        <Text style={styles.matrixLabel}>Target</Text>
-        <TargetMatrix matrix={target} m={m} cellSize={cellSize} />
+      {/* Fixed-height hint zone — keeps matrix Y-position stable */}
+      <View style={styles.hintZone}>
+        {gamePhase === 'preview' && peekMode && (
+          <>
+            <Text style={styles.previewTitle}>Memorize the target!</Text>
+            <Text style={styles.previewHint}>Tap "Ready" when you've got it.</Text>
+          </>
+        )}
       </View>
-      <CurrentMatrix
+
+      <CombinedMatrix
         current={current}
+        prevCurrent={prevCurrentRef.current}
+        target={target}
         n={n}
         m={m}
         cellSize={cellSize}
@@ -157,13 +155,45 @@ export default function GameBoard() {
         selectRow={selectRow}
         selectCol={selectCol}
         disabled={disabled}
+        sizeAnim={sizeAnim}
+        radiusAnim={radiusAnim}
+        resetFadeAnim={resetFadeAnim}
       />
+
+      {/* Fixed-height action zone — keeps matrix Y-position stable */}
+      <View style={styles.actionZone}>
+        {gamePhase === 'preview' && !peekMode && (
+          <TouchableOpacity style={styles.actionBtn} onPress={beginPlay}>
+            <Text style={styles.actionBtnText}>Start Solving ▶</Text>
+          </TouchableOpacity>
+        )}
+
+        {gamePhase === 'preview' && peekMode && (
+          <TouchableOpacity style={styles.actionBtn} onPress={startSolving}>
+            <Text style={styles.actionBtnText}>Ready to Solve →</Text>
+          </TouchableOpacity>
+        )}
+
+        {gamePhase === 'playing' && peekMode && !solved && (
+          <TouchableOpacity
+            style={[styles.peekBtn, isPeeking && styles.peekBtnActive]}
+            onPress={togglePeek}
+          >
+            <Text style={[styles.peekBtnText, isPeeking && styles.peekBtnTextActive]}>
+              {isPeeking ? '🙈 Hide — back to solving' : '👁 Peek at Target'}
+              {peekCount > 0 && `  (${peekCount} peek${peekCount > 1 ? 's' : ''})`}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
 
-function CurrentMatrix({
+function CombinedMatrix({
   current,
+  prevCurrent,
+  target,
   n,
   m,
   cellSize,
@@ -172,8 +202,13 @@ function CurrentMatrix({
   selectRow,
   selectCol,
   disabled,
+  sizeAnim,
+  radiusAnim,
+  resetFadeAnim,
 }: {
   current: number[][];
+  prevCurrent: number[][];
+  target: number[][];
   n: number;
   m: number;
   cellSize: number;
@@ -182,11 +217,13 @@ function CurrentMatrix({
   selectRow: (i: number) => void;
   selectCol: (j: number) => void;
   disabled: boolean;
+  sizeAnim: Animated.Value;
+  radiusAnim: Animated.Value;
+  resetFadeAnim: Animated.Value;
 }) {
   return (
     <View style={styles.matrixBlock}>
-      <Text style={styles.matrixLabel}>Current</Text>
-
+      {/* Column selector buttons */}
       <View style={styles.matrixRow}>
         <View style={{ width: BTN }} />
         {Array.from({ length: n }, (_, j) => (
@@ -207,6 +244,7 @@ function CurrentMatrix({
         ))}
       </View>
 
+      {/* Data rows */}
       {current.map((row, i) => (
         <View key={i} style={styles.matrixRow}>
           <TouchableOpacity
@@ -222,16 +260,41 @@ function CurrentMatrix({
               R{i}
             </Text>
           </TouchableOpacity>
+
           {row.map((val, j) => (
             <View
               key={j}
               style={[
                 styles.cell,
-                { width: cellSize, height: cellSize, backgroundColor: getColorForValue(val, m) },
+                {
+                  width: cellSize,
+                  height: cellSize,
+                  backgroundColor: getColorForValue(val, m),
+                },
                 selectedRow === i && styles.cellHighlightRow,
                 selectedCol === j && styles.cellHighlightCol,
               ]}
             >
+              {/* Target colour — animated square (preview) → small circle (playing) */}
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  width: sizeAnim,
+                  height: sizeAnim,
+                  borderRadius: radiusAnim,
+                  backgroundColor: getColorForValue(target[i][j], m),
+                }}
+              />
+              {/* Reset fade overlay — flashes old colours then fades to reveal new state */}
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  width: cellSize,
+                  height: cellSize,
+                  backgroundColor: getColorForValue(prevCurrent[i][j], m),
+                  opacity: resetFadeAnim,
+                }}
+              />
               {m > 2 && (
                 <Text style={[styles.cellText, { color: val === 0 ? '#333' : '#fff' }]}>
                   {val}
@@ -250,43 +313,40 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     padding: 8,
-  },
-  peekSolveOuter: {
     flex: 1,
-    width: '100%',
-    padding: 8,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+  },
+  hintZone: {
+    height: HINT_ZONE_HEIGHT,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 4,
+  },
+  actionZone: {
+    height: ACTION_ZONE_HEIGHT,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  peekContent: {
-    width: '100%',
-    alignItems: 'center',
+  previewTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#1a1a2e',
+    marginBottom: 2,
   },
-  matrixBlock: {
-    marginBottom: MATRIX_GAP,
+  previewHint: {
+    fontSize: 13,
+    color: '#555',
   },
-  matrixLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: '#333',
-    alignSelf: 'center',
-  },
+  matrixBlock: {},
   matrixRow: {
     flexDirection: 'row',
-  },
-  placeholder: {
-    backgroundColor: '#e8e8e8',
-    borderWidth: 1,
-    borderColor: '#bbb',
-    margin: 1,
-    borderRadius: 4,
   },
   cell: {
     borderWidth: 0.5,
     borderColor: '#888',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   cellHighlightRow: {
     opacity: 0.8,
@@ -323,32 +383,18 @@ const styles = StyleSheet.create({
   opBtnTextSelected: {
     color: '#fff',
   },
-  peekMemorizeTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a2e',
-    marginBottom: 4,
-    alignSelf: 'center',
-  },
-  peekMemorizeHint: {
-    fontSize: 13,
-    color: '#555',
-    marginBottom: 16,
-    alignSelf: 'center',
-  },
-  readyBtn: {
-    alignSelf: 'center',
+  actionBtn: {
     backgroundColor: '#1a3a5c',
     paddingHorizontal: 36,
     paddingVertical: 12,
     borderRadius: 10,
   },
-  readyBtnText: {
+  actionBtnText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  peekToggleBtn: {
+  peekBtn: {
     alignSelf: 'stretch',
     backgroundColor: '#fff',
     borderWidth: 2,
@@ -356,19 +402,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    marginBottom: 10,
     alignItems: 'center',
+    marginHorizontal: 8,
   },
-  peekToggleBtnActive: {
+  peekBtnActive: {
     backgroundColor: '#fff8e1',
     borderColor: '#f7a020',
   },
-  peekToggleBtnText: {
+  peekBtnText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4a90d9',
   },
-  peekToggleBtnTextActive: {
+  peekBtnTextActive: {
     color: '#c05000',
   },
 });

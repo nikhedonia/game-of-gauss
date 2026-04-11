@@ -64,7 +64,12 @@ export function generatePuzzle(n: number, m: number, numOps?: number): { current
   const ops = numOps ?? n * 2 + Math.floor(Math.random() * n);
   const target = randomTarget(n, m);
   // Scramble target via row/col ops to produce current.
-  const current = applyRandomOps(target, n, m, Math.max(1, ops));
+  // Keep applying extra ops until current differs from target (trivially-equal
+  // puzzles would have a solution of zero moves).
+  let current = applyRandomOps(target, n, m, Math.max(1, ops));
+  while (matricesEqual(current, target)) {
+    current = applyRandomOps(current, n, m, 2);
+  }
   return { current, target };
 }
 

@@ -1,5 +1,5 @@
 import create from 'zustand';
-import { GameConfig, Matrix, PeekPhase } from '../types';
+import { GameConfig, GamePhase, Matrix, PeekPhase } from '../types';
 import {
   identityMatrix,
   addRow,
@@ -28,6 +28,8 @@ interface GameState {
   peekPhase: PeekPhase;
   isPeeking: boolean;
   peekCount: number;
+  gamePhase: GamePhase;
+  resetCount: number;
 
   startGame: (config: GameConfig) => void;
   selectRow: (row: number) => void;
@@ -39,6 +41,7 @@ interface GameState {
   tick: () => void;
   startSolving: () => void;
   togglePeek: () => void;
+  beginPlay: () => void;
 }
 
 const DEFAULT_CONFIG: GameConfig = { n: 3, m: 2, mode: 'oneoff' };
@@ -61,10 +64,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   peekPhase: 'solve',
   isPeeking: false,
   peekCount: 0,
+  gamePhase: 'preview',
+  resetCount: 0,
 
   startGame: (config) => {
     const { current, target } = generatePuzzle(config.n, config.m);
     trackGameStart(config.mode, config.n, config.m);
+    // Race mode (without peekMode) jumps straight into playing; others show the target first
+    const gamePhase: GamePhase = config.mode === 'race' && !config.peekMode ? 'playing' : 'preview';
     set({
       screen: 'playing',
       config,
@@ -83,6 +90,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       peekPhase: config.peekMode ? 'memorize' : 'solve',
       isPeeking: false,
       peekCount: 0,
+      gamePhase,
     });
   },
 
@@ -118,6 +126,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           cumulativeMoves: cumulativeMoves + newMoveCount,
           selectedRow: null,
           selectedCol: null,
+          gamePhase: 'playing', // race keeps rolling without a preview pause
         });
         return;
       }
@@ -174,6 +183,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           cumulativeMoves: cumulativeMoves + newMoveCount,
           selectedRow: null,
           selectedCol: null,
+          gamePhase: 'playing',
         });
         return;
       }
@@ -201,6 +211,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   nextPuzzle: () => {
     const { config } = get();
     const { current, target } = generatePuzzle(config.n, config.m);
+    // oneoff + peekMode: show target preview again; race: not called (auto-advances inline)
     set({
       target,
       current,
@@ -213,17 +224,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       isPeeking: false,
       peekCount: 0,
       elapsedSecs: 0,
+      gamePhase: 'preview',
     });
   },
 
   resetPuzzle: () => {
-    const { initialCurrent } = get();
+    const { initialCurrent, resetCount } = get();
     set({
       current: initialCurrent,
       moveCount: 0,
       solved: false,
       selectedRow: null,
       selectedCol: null,
+      resetCount: resetCount + 1,
     });
   },
 
@@ -238,8 +251,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   goToStats: () => set({ screen: 'stats' }),
 
   tick: () => {
-    const { gameOver, solved, config, elapsedSecs, solvedCount, peekPhase, cumulativeMoves, peekCount } = get();
+    const { gameOver, solved, config, elapsedSecs, solvedCount, peekPhase, cumulativeMoves, peekCount, gamePhase } = get();
     if (gameOver) return;
+    if (gamePhase === 'preview') return; // timer doesn't run while player is viewing the target
     if (config.mode === 'oneoff' && solved) return;
     if (config.peekMode && (solved || peekPhase === 'memorize')) return;
 
@@ -265,7 +279,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   startSolving: () => {
-    set({ peekPhase: 'solve', isPeeking: false, elapsedSecs: 0 });
+    set({ peekPhase: 'solve', gamePhase: 'playing', isPeeking: false, elapsedSecs: 0 });
   },
 
   togglePeek: () => {
@@ -275,5 +289,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     } else {
       set({ isPeeking: false });
     }
+  },
+
+  beginPlay: () => {
+    set({ gamePhase: 'playing', elapsedSecs: 0, startTime: Date.now() });
   },
 }));
