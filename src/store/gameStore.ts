@@ -7,7 +7,7 @@ import {
   matricesEqual,
   generatePuzzle,
 } from '../gameLogic';
-import { trackGameStart, trackPuzzleSolved, trackGameEnd } from '../analytics';
+import { trackGameStart, trackPuzzleSolved, trackGameEnd, trackPuzzleAbandoned, trackPuzzleReset } from '../analytics';
 import { useStatsStore } from './statsStore';
 
 interface GameState {
@@ -69,7 +69,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   startGame: (config) => {
     const { current, target } = generatePuzzle(config.n, config.m);
-    trackGameStart(config.mode, config.n, config.m);
+    trackGameStart(config.mode, config.n, config.m, config.peekMode ?? false, config.raceTimeSecs);
     // Race mode (without peekMode) jumps straight into playing; others show the target first
     const gamePhase: GamePhase = config.mode === 'race' && !config.peekMode ? 'playing' : 'preview';
     set({
@@ -95,7 +95,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   selectRow: (row) => {
-    const { selectedRow, current, config, moveCount, elapsedSecs, solvedCount, cumulativeMoves } = get();
+    const { selectedRow, current, config, moveCount, elapsedSecs, solvedCount, cumulativeMoves, peekCount } = get();
 
     if (selectedRow === null) {
       set({ selectedRow: row, selectedCol: null });
@@ -112,7 +112,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const isSolved = matricesEqual(newMatrix, get().target);
 
     if (isSolved) {
-      trackPuzzleSolved(config.mode, newMoveCount, elapsedSecs);
+      trackPuzzleSolved(config.mode, config.n, config.m, newMoveCount, elapsedSecs, config.peekMode ?? false, peekCount);
       if (config.mode === 'race') {
         const newSolvedCount = solvedCount + 1;
         const { current: newCurrent, target: newTarget } = generatePuzzle(config.n, config.m);
@@ -152,7 +152,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   selectCol: (col) => {
-    const { selectedCol, current, config, moveCount, elapsedSecs, solvedCount, cumulativeMoves } = get();
+    const { selectedCol, current, config, moveCount, elapsedSecs, solvedCount, cumulativeMoves, peekCount } = get();
 
     if (selectedCol === null) {
       set({ selectedCol: col, selectedRow: null });
@@ -169,7 +169,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const isSolved = matricesEqual(newMatrix, get().target);
 
     if (isSolved) {
-      trackPuzzleSolved(config.mode, newMoveCount, elapsedSecs);
+      trackPuzzleSolved(config.mode, config.n, config.m, newMoveCount, elapsedSecs, config.peekMode ?? false, peekCount);
       if (config.mode === 'race') {
         const newSolvedCount = solvedCount + 1;
         const { current: newCurrent, target: newTarget } = generatePuzzle(config.n, config.m);
@@ -229,7 +229,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   resetPuzzle: () => {
-    const { initialCurrent, resetCount } = get();
+    const { initialCurrent, resetCount, config, moveCount } = get();
+    trackPuzzleReset(config.n, config.m, moveCount, config.peekMode ?? false);
     set({
       current: initialCurrent,
       moveCount: 0,
@@ -241,9 +242,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   backToSetup: () => {
-    const { config, solvedCount, elapsedSecs, screen } = get();
-    if (screen === 'playing' && config.mode === 'race') {
-      trackGameEnd(config.mode, solvedCount, elapsedSecs);
+    const { config, solvedCount, elapsedSecs, screen, moveCount, solved, cumulativeMoves, peekCount } = get();
+    if (screen === 'playing') {
+      if (config.mode === 'race') {
+        trackGameEnd(config.mode, config.n, config.m, solvedCount, elapsedSecs, config.peekMode ?? false, cumulativeMoves);
+      } else if (!solved && (moveCount > 0 || elapsedSecs > 0)) {
+        trackPuzzleAbandoned(config.mode, config.n, config.m, moveCount, elapsedSecs, config.peekMode ?? false);
+      }
     }
     set({ screen: 'setup' });
   },
@@ -260,7 +265,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const newElapsed = elapsedSecs + 1;
 
     if (config.mode === 'race' && config.raceTimeSecs && newElapsed >= config.raceTimeSecs) {
-      trackGameEnd(config.mode, solvedCount, newElapsed);
+      trackGameEnd(config.mode, config.n, config.m, solvedCount, newElapsed, config.peekMode ?? false, cumulativeMoves);
       useStatsStore.getState().addStat({
         mode: 'race',
         n: config.n,
